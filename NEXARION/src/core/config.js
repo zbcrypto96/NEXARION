@@ -37,9 +37,8 @@ const STORAGE_FILE = path.join(STORAGE_FOLDER, 'state.json');
 
 const rawSolanaRpcUrl = process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com';
 const envHeliusKey = process.env.HELIUS_API_KEY || '';
-const urlHeliusKey = !envHeliusKey ? parseHeliusKeyFromUrl(rawSolanaRpcUrl) : '';
-const heliusApiKey = envHeliusKey || urlHeliusKey || '';
-const heliusApiKeySource = envHeliusKey ? 'env' : urlHeliusKey ? 'rpc_url' : 'none';
+const heliusApiKey = envHeliusKey;
+const heliusApiKeySource = envHeliusKey ? 'env' : 'none';
 
 module.exports = {
   mode: parseBoolEnv('PAPER_MODE', true),

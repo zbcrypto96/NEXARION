@@ -24,7 +24,7 @@ class SolanaMonitorService extends EventEmitter {
 
   async start() {
     this.isRunning = true;
-    logger.info({ event: 'scanner_start', provider: config.solanaRpcUrl, helius: Boolean(config.heliusApiKey), heliusKeySource: config.heliusApiKeySource });
+    logger.info({ event: 'scanner_start', provider: config.solanaRpcUrl, heliusEnabled: Boolean(config.heliusApiKey && config.heliusApiKeySource === 'env'), dataSource: (config.heliusApiKey && config.heliusApiKeySource === 'env') ? 'helius_api' : 'solana_rpc' });
     this.consecutiveErrors = 0;
     while (this.isRunning) {
       try {
@@ -62,7 +62,7 @@ class SolanaMonitorService extends EventEmitter {
   }
 
   async fetchOnChainEvents() {
-    if (config.heliusApiKey) {
+    if (config.heliusApiKey && config.heliusApiKeySource === 'env') {
       return this.fetchHeliusEvents();
     }
 
