@@ -20,6 +20,7 @@ class SolanaMonitorService extends EventEmitter {
     this.isRunning = false;
     this.processedSignatures = new Set();
     this.mockTokens = ['NEXA', 'STRM', 'LQTY', 'MOON', 'GLOW'];
+    this.rpcRateLimitedUntil = 0;
   }
 
   async start() {
@@ -123,6 +124,12 @@ class SolanaMonitorService extends EventEmitter {
   }
 
   async fetchRpcEvents() {
+    if (Date.now() < this.rpcRateLimitedUntil) {
+      const waitMs = this.rpcRateLimitedUntil - Date.now();
+      logger.warn({ event: 'rpc_rate_limited', waitMs, message: 'Skipping RPC polling due to prior rate limit' });
+      return this.generateMockEvents();
+    }
+
     try {
       const signatureResponse = await axios.post(config.solanaRpcUrl, {
         jsonrpc: '2.0',
@@ -161,13 +168,15 @@ class SolanaMonitorService extends EventEmitter {
           const txBody = errTx.response?.data;
           logger.warn({ event: 'rpc_getTransaction_failed', signature, status: txStatus, message: errTx.message, body: txBody });
           if (txStatus === 429) {
-            const delayMs = 20000 + Math.floor(Math.random() * 10000);
-            logger.warn({ event: 'rpc_rate_limit_backoff', delayMs, message: 'Rate limited while fetching transaction details' });
+            const delayMs = 30000 + Math.floor(Math.random() * 15000);
+            this.rpcRateLimitedUntil = Date.now() + delayMs + 10000;
+            logger.warn({ event: 'rpc_rate_limit_backoff', delayMs, retryUntil: this.rpcRateLimitedUntil, message: 'Rate limited while fetching transaction details' });
             await sleep(delayMs);
             break;
           }
           if (txStatus === 400 || txStatus === 401 || txStatus === 403) {
             logger.error({ event: 'rpc_invalid_request', signature, status: txStatus, body: txBody, message: 'RPC transaction request failed due to bad request or invalid credentials' });
+            this.rpcRateLimitedUntil = Date.now() + 60000;
             await sleep(30000);
             break;
           }
@@ -183,11 +192,13 @@ class SolanaMonitorService extends EventEmitter {
       const body = err.response?.data;
       logger.warn({ event: 'rpc_signatures_failed', status: code, message: err.message, body });
       if (code === 429) {
-        const delayMs = 25000 + Math.floor(Math.random() * 10000);
-        logger.warn({ event: 'rpc_rate_limit_backoff', delayMs, message: 'Rate limited while listing signatures' });
+        const delayMs = 30000 + Math.floor(Math.random() * 15000);
+        this.rpcRateLimitedUntil = Date.now() + delayMs + 10000;
+        logger.warn({ event: 'rpc_rate_limit_backoff', delayMs, retryUntil: this.rpcRateLimitedUntil, message: 'Rate limited while listing signatures' });
         await sleep(delayMs);
       } else if (code === 400 || code === 401 || code === 403) {
         logger.error({ event: 'rpc_invalid_request', status: code, body, message: 'RPC signatures request failed due to bad request or invalid credentials' });
+        this.rpcRateLimitedUntil = Date.now() + 60000;
         await sleep(30000);
       } else {
         await sleep(2000 + Math.floor(Math.random() * 2000));
