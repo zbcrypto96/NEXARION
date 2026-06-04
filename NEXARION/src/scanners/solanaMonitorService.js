@@ -151,7 +151,14 @@ class SolanaMonitorService extends EventEmitter {
             events.push(parsed);
           }
         } catch (errTx) {
-          logger.warn({ event: 'rpc_getTransaction_failed', signature, message: errTx.message });
+          const txStatus = errTx.response?.status;
+          logger.warn({ event: 'rpc_getTransaction_failed', signature, status: txStatus, message: errTx.message });
+          if (txStatus === 429) {
+            const delayMs = 20000 + Math.floor(Math.random() * 10000);
+            logger.warn({ event: 'rpc_rate_limit_backoff', delayMs, message: 'Rate limited while fetching transaction details' });
+            await sleep(delayMs);
+            break;
+          }
           continue;
         }
       }
@@ -160,9 +167,15 @@ class SolanaMonitorService extends EventEmitter {
 
       return events.length ? events : this.generateMockEvents();
     } catch (err) {
-      logger.warn({ event: 'rpc_signatures_failed', message: err.message });
-      // exponential backoff for RPC failures
-      await sleep(2000 + Math.floor(Math.random() * 2000));
+      const code = err.response?.status;
+      logger.warn({ event: 'rpc_signatures_failed', status: code, message: err.message });
+      if (code === 429) {
+        const delayMs = 25000 + Math.floor(Math.random() * 10000);
+        logger.warn({ event: 'rpc_rate_limit_backoff', delayMs, message: 'Rate limited while listing signatures' });
+        await sleep(delayMs);
+      } else {
+        await sleep(2000 + Math.floor(Math.random() * 2000));
+      }
       return this.generateMockEvents();
     }
   }

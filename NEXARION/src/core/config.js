@@ -23,8 +23,22 @@ function parseListEnv(name, fallback) {
   return value.split(',').map((item) => item.trim()).filter(Boolean);
 }
 
+function parseHeliusKeyFromUrl(urlString) {
+  try {
+    const url = new URL(urlString);
+    return url.searchParams.get('api-key') || '';
+  } catch (error) {
+    return '';
+  }
+}
+
 const STORAGE_FOLDER = path.join(process.cwd(), 'storage');
 const STORAGE_FILE = path.join(STORAGE_FOLDER, 'state.json');
+
+const envHeliusKey = process.env.HELIUS_API_KEY || '';
+const urlHeliusKey = !envHeliusKey && process.env.SOLANA_RPC_URL
+  ? parseHeliusKeyFromUrl(process.env.SOLANA_RPC_URL)
+  : '';
 
 module.exports = {
   mode: parseBoolEnv('PAPER_MODE', true),
@@ -38,7 +52,7 @@ module.exports = {
   storageFile: STORAGE_FILE,
   serverPort: parseIntEnv('PORT', parseIntEnv('SERVER_PORT', 3000)),
   solanaRpcUrl: process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com',
-  heliusApiKey: process.env.HELIUS_API_KEY || '',
+  heliusApiKey: envHeliusKey || urlHeliusKey || '',
   telegramBotToken: process.env.TELEGRAM_BOT_TOKEN || '',
   telegramChatId: process.env.TELEGRAM_CHAT_ID || '',
   tradeReportEnabled: parseBoolEnv('TRADE_REPORT_ENABLED', true),
