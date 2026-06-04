@@ -35,10 +35,11 @@ function parseHeliusKeyFromUrl(urlString) {
 const STORAGE_FOLDER = path.join(process.cwd(), 'storage');
 const STORAGE_FILE = path.join(STORAGE_FOLDER, 'state.json');
 
+const rawSolanaRpcUrl = process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com';
 const envHeliusKey = process.env.HELIUS_API_KEY || '';
-const urlHeliusKey = !envHeliusKey && process.env.SOLANA_RPC_URL
-  ? parseHeliusKeyFromUrl(process.env.SOLANA_RPC_URL)
-  : '';
+const urlHeliusKey = !envHeliusKey ? parseHeliusKeyFromUrl(rawSolanaRpcUrl) : '';
+const heliusApiKey = envHeliusKey || urlHeliusKey || '';
+const heliusApiKeySource = envHeliusKey ? 'env' : urlHeliusKey ? 'rpc_url' : 'none';
 
 module.exports = {
   mode: parseBoolEnv('PAPER_MODE', true),
@@ -51,8 +52,9 @@ module.exports = {
   storageFolder: STORAGE_FOLDER,
   storageFile: STORAGE_FILE,
   serverPort: parseIntEnv('PORT', parseIntEnv('SERVER_PORT', 3000)),
-  solanaRpcUrl: process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com',
-  heliusApiKey: envHeliusKey || urlHeliusKey || '',
+  solanaRpcUrl: rawSolanaRpcUrl,
+  heliusApiKey,
+  heliusApiKeySource,
   telegramBotToken: process.env.TELEGRAM_BOT_TOKEN || '',
   telegramChatId: process.env.TELEGRAM_CHAT_ID || '',
   tradeReportEnabled: parseBoolEnv('TRADE_REPORT_ENABLED', true),

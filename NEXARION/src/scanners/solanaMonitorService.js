@@ -24,7 +24,7 @@ class SolanaMonitorService extends EventEmitter {
 
   async start() {
     this.isRunning = true;
-    logger.info({ event: 'scanner_start', provider: config.solanaRpcUrl, helius: Boolean(config.heliusApiKey) });
+    logger.info({ event: 'scanner_start', provider: config.solanaRpcUrl, helius: Boolean(config.heliusApiKey), heliusKeySource: config.heliusApiKeySource });
     this.consecutiveErrors = 0;
     while (this.isRunning) {
       try {
@@ -83,10 +83,16 @@ class SolanaMonitorService extends EventEmitter {
         break;
       } catch (err) {
         const code = err.response?.status;
-        const backoffBase = code === 429 ? 3000 : 800;
+        const body = err.response?.data;
+        const backoffBase = code === 429 ? 5000 : 1200;
         const jitter = Math.floor(Math.random() * 500);
         const backoff = backoffBase * attempt + jitter;
-        logger.warn({ event: 'helius_request_failed', attempt, code, message: err.message, backoff });
+        logger.warn({ event: 'helius_request_failed', attempt, code, message: err.message, body, backoff });
+        if (code === 400 || code === 401 || code === 403) {
+          logger.error({ event: 'helius_auth_or_bad_request', code, body, message: 'Helius API request failed due to invalid credentials or invalid request format' });
+          await sleep(60000);
+          return this.generateMockEvents();
+        }
         await sleep(backoff);
       }
     }
@@ -152,11 +158,17 @@ class SolanaMonitorService extends EventEmitter {
           }
         } catch (errTx) {
           const txStatus = errTx.response?.status;
-          logger.warn({ event: 'rpc_getTransaction_failed', signature, status: txStatus, message: errTx.message });
+          const txBody = errTx.response?.data;
+          logger.warn({ event: 'rpc_getTransaction_failed', signature, status: txStatus, message: errTx.message, body: txBody });
           if (txStatus === 429) {
             const delayMs = 20000 + Math.floor(Math.random() * 10000);
             logger.warn({ event: 'rpc_rate_limit_backoff', delayMs, message: 'Rate limited while fetching transaction details' });
             await sleep(delayMs);
+            break;
+          }
+          if (txStatus === 400 || txStatus === 401 || txStatus === 403) {
+            logger.error({ event: 'rpc_invalid_request', signature, status: txStatus, body: txBody, message: 'RPC transaction request failed due to bad request or invalid credentials' });
+            await sleep(30000);
             break;
           }
           continue;
@@ -168,11 +180,15 @@ class SolanaMonitorService extends EventEmitter {
       return events.length ? events : this.generateMockEvents();
     } catch (err) {
       const code = err.response?.status;
-      logger.warn({ event: 'rpc_signatures_failed', status: code, message: err.message });
+      const body = err.response?.data;
+      logger.warn({ event: 'rpc_signatures_failed', status: code, message: err.message, body });
       if (code === 429) {
         const delayMs = 25000 + Math.floor(Math.random() * 10000);
         logger.warn({ event: 'rpc_rate_limit_backoff', delayMs, message: 'Rate limited while listing signatures' });
         await sleep(delayMs);
+      } else if (code === 400 || code === 401 || code === 403) {
+        logger.error({ event: 'rpc_invalid_request', status: code, body, message: 'RPC signatures request failed due to bad request or invalid credentials' });
+        await sleep(30000);
       } else {
         await sleep(2000 + Math.floor(Math.random() * 2000));
       }
