@@ -6,6 +6,11 @@ This repository contains the NEXARION Node.js paper-trading and analytics platfo
 
 A root-level `Dockerfile` is included to enable Railway deployment from the repository root. Railway will build the app from the `NEXARION` folder and run `npm start`.
 
+Railway-specific configuration files are included:
+- `Procfile` — locks the web process start command to `cd NEXARION && npm start`
+- `railway.json` — instructs Railway to use the Docker builder and the app start command
+- `.env.example` — root example environment file for Railway and local dev
+
 Set the following Railway environment variables as needed:
 - `PORT` (Railway will provide one automatically)
 - `PAPER_MODE` (true/false)
